@@ -1,0 +1,29 @@
+housing:
+  local_path: data/01_raw/housing_main.csv
+
+lookup:
+  local_path: data/01_raw/housing_lookup.csv
+
+processed_housing:
+  local_path: data/02_intermediate/processed_housing.csv
+
+mastertable:
+  local_path: data/03_primary/mastertable.csv
+
+x_train:
+  local_path: data/04_model_input/x_train.csv
+
+y_train:
+  local_path: data/04_model_input/y_train.csv
+
+lr_model:
+  local_path: data/05_model_output/lr_model.pkl
+
+x_test:
+  local_path: data/06_evaluation/x_test.csv
+
+y_test:
+  local_path: data/06_evaluation/y_test.csv
+
+metrics:
+  local_path: data/06_evaluation/metrics.csv
