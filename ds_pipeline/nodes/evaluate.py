@@ -5,11 +5,11 @@ import pickle
 import shap
 import matplotlib.pyplot as pl
 
-from helper.data_helper import get_data_path, get_data_path, save_dataframes
+from helper.data_helper import map_data_assets, save_dataframes
 
 def evaluate(input_data: list[str], output_data: list[str], is_local) -> pd.DataFrame:
-    input_data_assets = get_data_path(input_data, is_local)
-    output_data_assets = get_data_path(output_data, is_local=is_local)
+    input_data_assets = map_data_assets(input_data, is_local)
+    output_data_assets = map_data_assets(output_data, is_local=is_local)
     
     x_test = pd.read_csv(input_data_assets['x_test'])
     y_test = pd.read_csv(input_data_assets['y_test'])

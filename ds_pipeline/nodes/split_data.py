@@ -1,10 +1,10 @@
 import pandas as pd
-from helper.data_helper import get_data_path, save_dataframes
+from helper.data_helper import map_data_assets, save_dataframes
 from sklearn.model_selection import train_test_split
 
 
 def training_split(input_data: list[str], output_data: list[str], is_local) -> pd.DataFrame:
-    data_assets = get_data_path(input_data, is_local)
+    data_assets = map_data_assets(input_data, is_local)
     
     housing_df = pd.read_csv(data_assets['mastertable'])
     
