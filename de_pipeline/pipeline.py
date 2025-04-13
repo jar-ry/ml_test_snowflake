@@ -10,8 +10,8 @@ def run_de_pipeline(is_local):
         output_data=["processed_housing"],
         is_local=is_local
     )
-    process_data(
-        input_data=["processed_housing", "lookup"],
-        output_data=["mastertable"],
-        is_local=is_local
-    )
+    # process_data(
+    #     input_data=["processed_housing", "lookup"],
+    #     output_data=["mastertable"],
+    #     is_local=is_local
+    # )

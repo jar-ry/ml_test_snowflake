@@ -1,0 +1,13 @@
+snowflake:
+  connection:
+    credentials: snowflake
+  runtime:
+    # Default schedule for Kedro tasks
+    schedule: "11520 minute"
+
+    # Optional suffix for all kedro stored procedures
+    stored_procedure_name_suffix: ""
+
+    # Optionally provide mapping for user-friendly pipeline names
+    pipeline_name_mapping:
+     __default__: default

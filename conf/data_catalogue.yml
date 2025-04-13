@@ -1,5 +1,7 @@
 housing:
   local_path: data/01_raw/housing_main.csv
+  target_path: "@my_stage/raw/"
+  file_type: csv
 
 lookup:
   local_path: data/01_raw/housing_lookup.csv
