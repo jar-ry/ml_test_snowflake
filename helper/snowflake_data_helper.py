@@ -1,5 +1,7 @@
 from typing import Union
 import snowflake.snowpark as sp
+from snowflake.snowpark import DataFrame as SPDataFrame
+from snowflake.snowpark import DataFrameWriter
 from pathlib import Path
 import pandas as pd
 import logging
@@ -21,7 +23,7 @@ class SnowflakeDataHelper:
 
     def _ensure_stage_exists(self, stage_path: str) -> None:
         stage_name = self._extract_stage_name(stage_path)
-        print("HERERER")
+        
         try:
             logger.debug(f"Ensuring stage {stage_name} exists...")
             result = self._snowflake_session.sql(
@@ -48,27 +50,59 @@ class SnowflakeDataHelper:
             overwrite=True
         )
 
-    def save_file(self, data: pd.DataFrame, local_path: Union[str, Path], stage_path: str, file_type: str = "csv") -> None:
+    def save_dataframe(self, data: Union[pd.DataFrame, SPDataFrame], local_path: Union[str, Path], stage_path: str, file_type: str = "csv", table_name: str = None) -> None:
         local_path = Path(local_path)
         if not local_path.parent.exists():
             local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if file_type == "csv":
-            data.to_csv(local_path, index=False)
-        elif file_type == "parquet":
-            data.to_parquet(local_path, index=False)
-        else:
-            raise ValueError(f"Unsupported file type: {file_type}")
+        self._ensure_stage_exists(stage_path)
 
-        stage_name = self._extract_stage_name(stage_path)
-        self._ensure_stage_exists(stage_name)
+        if isinstance(data, pd.DataFrame):
+            temp_path = local_path.with_suffix(f".{file_type}")
+            if file_type == "csv":
+                data.to_csv(temp_path, index=False)
+            elif file_type == "parquet":
+                data.to_parquet(temp_path, index=False)
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+            self._snowflake_session.file.put(str(temp_path), stage_path, auto_compress=False, overwrite=True)
 
-        self._snowflake_session.file.put(
-            str(local_path.absolute()),
-            stage_path,
-            auto_compress=False,
-            overwrite=True
-        )
+            if table_name:
+                # Load the file into a Snowflake table
+                format_type_options = "TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='\"'" if file_type == "csv" else "TYPE=PARQUET"
+                self._snowflake_session.sql(f"""
+                    COPY INTO {table_name}
+                    FROM @{stage_path}/{temp_path.name}
+                    FILE_FORMAT = ({format_type_options})
+                    ON_ERROR = 'CONTINUE'
+                """).collect()
+
+        elif isinstance(data, SPDataFrame):
+            # Save Snowpark DataFrame to stage
+            stage_subdir = stage_path.split("/")[1] if "/" in stage_path else "temp_export"
+            if file_type == "csv":
+                data.write.copy_into_location(
+                    stage_path, 
+                    file_format_type="csv", # In production system use "file_format_name" and create a named file format
+                    format_type_options={'COMPRESSION':'None'},
+                    overwrite=True, 
+                )
+            elif file_type == "parquet":
+                data.write.copy_into_location(
+                    stage_path, 
+                    file_format_type="parquet", # In production system use "file_format_name" and create a named file format
+                    format_type_options={'COMPRESSION':'None'},
+                    overwrite=True, 
+                )
+
+            if table_name:
+                # Load Snowpark DataFrame into Snowflake table
+                data.write.save_as_table(table_name, mode="overwrite")
+
+        # Download from stage to local
+        # self._snowflake_session.file.get(stage_path, str(local_path.parent))
+        # print(f"Downloaded to local: {local_path.parent}")
+
 
     def load_file(self, local_path: Union[str, Path], stage_path: str, file_type: str = "csv") -> pd.DataFrame:
         local_path = Path(local_path)

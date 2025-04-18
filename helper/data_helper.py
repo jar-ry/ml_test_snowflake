@@ -51,7 +51,7 @@ def save_dataframes(
     dataframes: dict[str, pd.DataFrame],
     data_assets: list[str],
     is_local: bool,
-    connection_parameters: Dict[str, Any] = None
+    sf_helper: SnowflakeDataHelper
 ):
     """
     Save dataframe using data asset name
@@ -64,40 +64,34 @@ def save_dataframes(
     """
     assets_details = map_data_assets(data_assets)
 
-    if not is_local and connection_parameters is None:
-        raise ValueError("Connection parameters must be provided for Snowflake save.")
-
-    sf_helper = SnowflakeDataHelper(connection_parameters) if not is_local else None
+    if not is_local and sf_helper is None:
+        raise ValueError("SnowflakeDataHelper must be provided for Snowflake save.")
 
     for asset_name, df in dataframes.items():
         asset_info = assets_details[asset_name]
         file_type = asset_info.get("file_type", "csv")
         is_folder = asset_info.get("is_folder", False)
+        table_name = asset_info.get("table_name", None)
+        
+        local_path = Path(asset_info["local_path"])
+        target_file = asset_info["target_path"]
 
-        if is_local:
-            file_path = Path(asset_info["local_path"])
-            if is_folder:
-                file_path.mkdir(parents=True, exist_ok=True)
-                save_file = file_path / f"{asset_name}.{file_type}"
-            else:
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-                save_file = file_path
-
-            if file_type == "csv":
-                df.to_csv(save_file, index=False)
-            elif file_type == "parquet":
-                df.to_parquet(save_file, index=False)
-
-        else:
-            file_path = asset_info["target_path"]
-            if is_folder:
-                # Handle folder logic: maybe upload to @stage/folder/filename.csv
-                target_file = f"{file_path.rstrip('/')}/{asset_name}.{file_type}"
-            else:
-                target_file = file_path
-
-            sf_helper.save(df, target_file, file_type)
+        if is_folder:   
+            local_path.mkdir(parents=True, exist_ok=True)
+            local_path = local_path / f"{asset_name}.{file_type}"
             
+            # Handle folder logic: maybe upload to @stage/folder/filename.csv
+            target_file = f"{target_file.rstrip('/')}/{asset_name}.{file_type}"
+        else:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        sf_helper.save_dataframe(
+            data = df,
+            local_path=local_path,
+            stage_path=target_file,
+            file_type=file_type,
+            table_name=table_name
+        )
 
 
 def get_data_reference(

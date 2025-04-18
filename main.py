@@ -1,7 +1,8 @@
-from de_pipeline.pipeline import run_de_pipeline
+from de_pipeline.pipeline import run_de_pipeline, register_de_nodes
 from ds_pipeline.pipeline import run_ds_pipeline
 import argparse
 import logging
+from helper.snowflake_connect_manager import SnowflakeConnectionManager
 
 def parse_args():
     # Set up arg parser
@@ -25,8 +26,15 @@ if __name__  == "__main__":
         for lib in logging.root.manager.loggerDict:
             if not lib.startswith("helper"):
                 logging.getLogger(lib).setLevel(logging.WARNING)
-        
+    
+    conn_mgr = SnowflakeConnectionManager()
+    session = conn_mgr.create_session()
+    
+    register_de_nodes(
+        session
+    )
     run_de_pipeline(
+        session=session,
         is_local=args.local
     )
 

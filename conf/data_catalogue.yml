@@ -1,31 +1,45 @@
 housing:
   local_path: data/01_raw/housing_main.csv
-  target_path: "@my_stage/raw/"
+  target_path: "@my_stage/01_raw/housing_main.csv"
   file_type: csv
 
 lookup:
   local_path: data/01_raw/housing_lookup.csv
+  target_path: "@my_stage/01_raw/housing_lookup.csv"
+  file_type: csv
 
 processed_housing:
-  local_path: data/02_intermediate/processed_housing.csv
+  local_path: data/02_intermediate/processed_housing
+  target_path: "@my_stage/02_intermediate/processed_housing/"
+  is_folder: True
+  file_type: csv
 
 mastertable:
-  local_path: data/03_primary/mastertable.csv
+  local_path: data/03_primary/mastertable
+  target_path: "@my_stage/03_primary/mastertable/"
+  is_folder: True
+  file_type: csv
 
 x_train:
   local_path: data/04_model_input/x_train.csv
+  target_path: "@my_stage/04_model_input/"
 
 y_train:
   local_path: data/04_model_input/y_train.csv
+  target_path: "@my_stage/04_model_input/"
 
 lr_model:
   local_path: data/05_model_output/lr_model.pkl
+  target_path: "@my_stage/05_model_output/"
 
 x_test:
   local_path: data/06_evaluation/x_test.csv
+  target_path: "@my_stage/06_evaluation/"
 
 y_test:
   local_path: data/06_evaluation/y_test.csv
+  target_path: "@my_stage/06_evaluation/"
 
 metrics:
   local_path: data/06_evaluation/metrics.csv
+  target_path: "@my_stage/06_evaluation/"

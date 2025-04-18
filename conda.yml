@@ -9,4 +9,4 @@ dependencies:
     - PyYAML==6.0.1
     - shap==0.46.0
     - matplotlib==3.10.0
-    - snowflake-snowpark-python==1.30.0
+    - snowflake-snowpark-python==1.9.0
