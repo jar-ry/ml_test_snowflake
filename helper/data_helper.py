@@ -1,31 +1,40 @@
-import os
 import yaml
 import pandas as pd
 from helper.snowflake_data_helper import SnowflakeDataHelper
+from snowflake.snowpark import DataFrame as SPDataFrame
+
 from pathlib import Path
-from typing import Any, Dict, Union, List
+from typing import Union, List
+import pkgutil
 
 
 def _get_data_catalogue(data_catalogue_file: str = "data_catalogue.yml") -> dict:
     """
-    Get data catalogue configuration as dictionary
-
-    Args:
-        data_catalogue_file (str, optional): Data catalogue file name. Defaults to "data_catalogue.yml".
-
-    Returns:
-        dict: dictionary values of the data catalogue
+    Load data catalogue YAML, supporting both local and Snowflake sproc execution.
     """
-    # Path to YAML
-    current_dir = Path(__file__).resolve().parent
-    yaml_file_path = current_dir / ".." / "conf" / data_catalogue_file
-    yaml_file_path = yaml_file_path.resolve()  # resolves symlinks and makes it absolute
+    # Option 1: Local execution path (actual file system)
+    local_paths = [
+        Path(__file__).resolve().parent / ".." / "conf" / data_catalogue_file,
+    ]
 
+    for path in local_paths:
+        try:
+            path = path.resolve()
+            if path.exists():
+                with open(path, "r") as f:
+                    return yaml.safe_load(f)
+        except Exception:
+            pass  # If path can't resolve (e.g. ZIP context), move on
 
-    # Open YAML file and load
-    with open(yaml_file_path, "r") as yaml_file:
-        data_catalogue = yaml.safe_load(yaml_file)
-    return data_catalogue
+    # Option 2: Sproc execution via zipimport — try reading as resource
+    try:
+        yaml_bytes = pkgutil.get_data("conf", data_catalogue_file)
+        if yaml_bytes is not None:
+            return yaml.safe_load(yaml_bytes.decode("utf-8"))
+    except Exception:
+        pass
+
+    raise FileNotFoundError(f"Could not find {data_catalogue_file} in local paths or package resources.")
 
 
 def map_data_assets(data_assets: list[str], **kwargs) -> dict:
@@ -48,7 +57,7 @@ def map_data_assets(data_assets: list[str], **kwargs) -> dict:
     return data_dict
 
 def save_dataframes(
-    dataframes: dict[str, pd.DataFrame],
+    dataframes: dict[str, Union[pd.DataFrame, SPDataFrame]],
     data_assets: list[str],
     is_local: bool,
     sf_helper: SnowflakeDataHelper
@@ -57,10 +66,10 @@ def save_dataframes(
     Save dataframe using data asset name
 
     Args:
-        dataframes (dict[str, pd.DataFrame]): Dictionary of data asset and dataframe objects
-        data_assets (list[str]): List of data asset
-        is_local (bool): Flag to indictate if job is running locally
-        save_type (str, optional): Format to save the dataframe. Defaults to "csv".
+        dataframes (dict[str, DataFrame]): Dictionary of asset names to dataframes.
+        data_assets (list[str]): List of asset names to save.
+        is_local (bool): Whether running locally or in Snowflake.
+        sf_helper (SnowflakeDataHelper): Required when not local.
     """
     assets_details = map_data_assets(data_assets)
 
@@ -72,27 +81,30 @@ def save_dataframes(
         file_type = asset_info.get("file_type", "csv")
         is_folder = asset_info.get("is_folder", False)
         table_name = asset_info.get("table_name", None)
-        
+
         local_path = Path(asset_info["local_path"])
         target_file = asset_info["target_path"]
 
-        if is_folder:   
-            local_path.mkdir(parents=True, exist_ok=True)
-            local_path = local_path / f"{asset_name}.{file_type}"
-            
-            # Handle folder logic: maybe upload to @stage/folder/filename.csv
-            target_file = f"{target_file.rstrip('/')}/{asset_name}.{file_type}"
-        else:
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        sf_helper.save_dataframe(
-            data = df,
-            local_path=local_path,
-            stage_path=target_file,
-            file_type=file_type,
-            table_name=table_name
-        )
+        if is_local:
+            # Local save
+            if is_folder:
+                local_path.mkdir(parents=True, exist_ok=True)
+                local_path = local_path / f"{asset_name}.{file_type}"
+            else:
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(local_path, index=False) if file_type == "csv" else df.to_parquet(local_path, index=False)
 
+        else:
+            # Snowflake save
+            if is_folder:
+                target_file = f"{target_file.rstrip('/')}/{asset_name}.{file_type}"
+            sf_helper.save_dataframe(
+                data=df,
+                local_path=local_path,  # Still needed for Pandas temp file in Snowflake
+                stage_path=target_file,
+                file_type=file_type,
+                table_name=table_name
+            )
 
 def get_data_reference(
     asset_details: dict,

@@ -1,7 +1,6 @@
 from typing import Union
 import snowflake.snowpark as sp
 from snowflake.snowpark import DataFrame as SPDataFrame
-from snowflake.snowpark import DataFrameWriter
 from pathlib import Path
 import pandas as pd
 import logging
@@ -50,26 +49,39 @@ class SnowflakeDataHelper:
             overwrite=True
         )
 
-    def save_dataframe(self, data: Union[pd.DataFrame, SPDataFrame], local_path: Union[str, Path], stage_path: str, file_type: str = "csv", table_name: str = None) -> None:
+    def save_dataframe(
+        self, 
+        data: Union[pd.DataFrame, SPDataFrame], 
+        local_path: Union[str, Path], 
+        stage_path: str, 
+        file_type: str = "csv", 
+        table_name: str = None
+    ) -> None:
         local_path = Path(local_path)
-        if not local_path.parent.exists():
-            local_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._ensure_stage_exists(stage_path)
 
         if isinstance(data, pd.DataFrame):
-            temp_path = local_path.with_suffix(f".{file_type}")
+            # Use in-memory temp file path
+            temp_path = Path(f"/tmp/temp_upload.{file_type}")
             if file_type == "csv":
                 data.to_csv(temp_path, index=False)
             elif file_type == "parquet":
                 data.to_parquet(temp_path, index=False)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
-            self._snowflake_session.file.put(str(temp_path), stage_path, auto_compress=False, overwrite=True)
+
+            self._snowflake_session.file.put(
+                str(temp_path), stage_path, auto_compress=False, overwrite=True
+            )
 
             if table_name:
                 # Load the file into a Snowflake table
-                format_type_options = "TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='\"'" if file_type == "csv" else "TYPE=PARQUET"
+                format_type_options = (
+                    "TYPE=CSV FIELD_OPTIONALLY_ENCLOSED_BY='\"'"
+                    if file_type == "csv"
+                    else "TYPE=PARQUET"
+                )
                 self._snowflake_session.sql(f"""
                     COPY INTO {table_name}
                     FROM @{stage_path}/{temp_path.name}
@@ -79,7 +91,6 @@ class SnowflakeDataHelper:
 
         elif isinstance(data, SPDataFrame):
             # Save Snowpark DataFrame to stage
-            stage_subdir = stage_path.split("/")[1] if "/" in stage_path else "temp_export"
             if file_type == "csv":
                 data.write.copy_into_location(
                     stage_path, 
